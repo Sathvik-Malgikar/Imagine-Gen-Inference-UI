@@ -12,7 +12,7 @@ from collections import Counter
 from io import BytesIO
 import requests
 import tempfile
-import moviepy as mp
+import moviepy.editor as mp
 import lightning as L
 from tqdm import tqdm
 import tqdm.notebook as tq
@@ -34,8 +34,8 @@ from datasets.features.features import FeatureType, _align_features, _check_if_f
 from datasets.formatting.formatting import PythonFormatter, TensorFormatter
 from datasets.formatting import get_format_type_from_alias, get_formatter
 
-sys.path.append('/kaggle/working/VideoCrafter')
-# print("DEEBUG",sys.path)
+sys.path.append('./VideoCrafter')
+
 
 ## VideoCrafter Specific Imports
 from omegaconf import OmegaConf
@@ -504,7 +504,7 @@ class DDIMSampler(object):
             size = (batch_size, C, T, H, W)
         # print(f'Data shape for DDIM sampling is {size}, eta {eta}')
         
-        for temp__ in self.ddim_sampling(conditioning, size,
+        samples, intermediates = self.ddim_sampling(conditioning, size,
                                                     callback=callback,
                                                     img_callback=img_callback,
                                                     quantize_denoised=quantize_x0,
@@ -519,12 +519,8 @@ class DDIMSampler(object):
                                                     unconditional_guidance_scale=unconditional_guidance_scale,
                                                     unconditional_conditioning=unconditional_conditioning,
                                                     verbose=verbose,
-                                                    **kwargs):
-            if type(temp__)!=int:
-                samples, intermediates = temp__
-                break
-            yield temp__
-        yield samples, intermediates
+                                                    **kwargs)
+        return samples, intermediates
 
     @torch.no_grad()
     def ddim_sampling(self, cond, shape,
@@ -560,8 +556,6 @@ class DDIMSampler(object):
         init_x0 = False
         clean_cond = kwargs.pop("clean_cond", False)
         for i, step in enumerate(iterator):
-            print("DEBUG YIELD",i)
-            yield i
             index = total_steps - i - 1
             ts = torch.full((b,), step, device=device, dtype=torch.long)
             if start_timesteps is not None:
@@ -606,7 +600,7 @@ class DDIMSampler(object):
                 intermediates['x_inter'].append(img)
                 intermediates['pred_x0'].append(pred_x0)
 
-        yield img, intermediates
+        return img, intermediates
 
     @torch.no_grad()
     def p_sample_ddim(self, x, c, t, index, repeat_noise=False, use_original_steps=False, quantize_denoised=False,
@@ -758,6 +752,7 @@ KEYFRAME_COUNT = 16
 DATALOADER_NUM_PROCS = 6
 DTYPE_PT = torch.float32
 
+# PyTorch LightningModule Class
 class InteractiveChatVideoGenModel(L.LightningModule):
     def __init__(
             self, 
@@ -781,11 +776,12 @@ class InteractiveChatVideoGenModel(L.LightningModule):
             batch_size=8,
             use_llm=True, 
             use_tpu_vm=False, 
+            use_vae=False,
             tpu_mesh=None, 
             fsdp_auto_wrap_policy=None, 
             shard_output_callback=None, 
             use_xla=False,
-            yaml_config_file_path='/kaggle/working/VideoCrafter/configs/inference_t2v_512_v2.0.yaml'):
+            yaml_config_file_path='./VideoCrafter/configs/inference_t2v_512_v2.0.yaml'):
             
         super(InteractiveChatVideoGenModel, self).__init__()
         self.height = height
@@ -797,10 +793,11 @@ class InteractiveChatVideoGenModel(L.LightningModule):
         self.vae_id = vae
         self.vae_subfolder = vae_subfolder
         self.latent_size = 32
-        self.latent_channels = 1
+        self.latent_channels = 4
         self.train_timesteps = train_timesteps
         self.num_frames = num_frames
         self.cfg_uncond_prob = cfg_uncond_prob
+        self.yaml_config_file_path = yaml_config_file_path
         
         
         self.unet = None
@@ -823,16 +820,16 @@ class InteractiveChatVideoGenModel(L.LightningModule):
         self.use_llm = use_llm
         self.use_tpu_vm = use_tpu_vm
         self.use_xla = use_xla
+        self.use_vae = use_vae
         self.bridge_mlp = None
         self.tpu_mesh=tpu_mesh
         
-        config = OmegaConf.load('/kaggle/working/VideoCrafter/configs/inference_t2v_512_v2.0.yaml')
+        config = OmegaConf.load(self.yaml_config_file_path)
         model_config = config.pop("model", OmegaConf.create())
         
         self.latent_diffusion_model_config = model_config
         self.unet_model_channels = unet_model_channels
         self.unet_use_gradient_checkpointing = unet_use_gradient_checkpointing
-        print()
         
         self.latent_diffusion_model_config['params']['unet_config']['params']['model_channels'] = self.unet_model_channels
         
@@ -843,17 +840,10 @@ class InteractiveChatVideoGenModel(L.LightningModule):
         self.latent_diffusion_model_config['params']['unet_config']['params']['temporal_length'] = self.num_frames
         
         self.latent_diffusion_model_config['params']['uncond_type']  = "zero_embed"
-
-        self.latent_diffusion_model_config['params']['unet_config']['params']['in_channels'] = self.latent_channels
-        self.latent_diffusion_model_config['params']['unet_config']['params']['out_channels'] = self.latent_channels
-        
         if self.use_tpu_vm:
             self.tpu_mesh = tpu_mesh
             self.fsdp_auto_wrap_policy = fsdp_auto_wrap_policy
             self.shard_output_callback = shard_output_callback
-
-        #For BW conversion
-        self.grayscale_weights = torch.tensor([0.2989, 0.5870, 0.1140]).view(1, 3, 1, 1)
 
     # Model Configuration Methods
 
@@ -873,25 +863,25 @@ class InteractiveChatVideoGenModel(L.LightningModule):
             self.multimodal_llm_processor = LlavaNextVideoProcessor.from_pretrained(
                 self.multimodal_llm_id)
 
-        # if self.vae is None:
-        #     self.vae = AutoencoderKLTemporalDecoder.from_pretrained(
-        #         self.vae_id, subfolder=self.vae_subfolder)
-        #     if self.use_tpu_vm:
-        #         self.vae = SpmdFullyShardedDataParallel(
-        #             self.vae, mesh=self.tpu_mesh, auto_wrap_policy=self.fsdp_auto_wrap_policy, shard_output=self.shard_output_callback)
+        if self.vae is None and self.use_vae:
+            self.vae = AutoencoderKLTemporalDecoder.from_pretrained(
+                self.vae_id, subfolder=self.vae_subfolder)
+            if self.use_tpu_vm:
+                self.vae = SpmdFullyShardedDataParallel(
+                    self.vae, mesh=self.tpu_mesh, auto_wrap_policy=self.fsdp_auto_wrap_policy, shard_output=self.shard_output_callback)
 
-        #     self.vae_scale_factor = 2 ** (
-        #         len(self.vae.config.block_out_channels)-1)
-        #     self.vae.eval()
-        #     for param in self.vae.parameters():
-        #         param.requires_grad = False
+            self.vae_scale_factor = 2 ** (
+                len(self.vae.config.block_out_channels)-1)
+            self.vae.eval()
+            for param in self.vae.parameters():
+                param.requires_grad = False
                 
                 
         if self.unet is None:
             self.latent_diffusion_model = LatentDiffusion(**self.latent_diffusion_model_config.get("params", dict()))
             self.unet = self.latent_diffusion_model.model.diffusion_model
             self.ddim_sampler = DDIMSampler(self.latent_diffusion_model)
-            self.ddim_sampler.make_schedule(self.train_timesteps,ddim_eta=1,verbose=False)
+            #self.ddim_sampler.make_schedule(self.train_timesteps,ddim_eta=1,verbose=False)
 
         if self.bridge_mlp is None:
             self.bridge_mlp = nn.Sequential(
@@ -919,6 +909,11 @@ class InteractiveChatVideoGenModel(L.LightningModule):
     def vae_decode(self, z):
         return self.vae.decode(z)
 
+    def vae_temp_decode(self,z,num_frames=None):
+        if num_frames is None:
+            num_frames=self.num_frames
+        return self.vae.decode(z,num_frames=num_frames)
+
     @torch.no_grad()
     def get_vae_latent_from_frame(self, frame):
         encoded_img = self.vae_encode(frame)
@@ -929,6 +924,10 @@ class InteractiveChatVideoGenModel(L.LightningModule):
     @torch.no_grad()
     def get_decoded_frame_from_latent(self, z):
         return self.vae_decode(z).sample
+
+    @torch.no_grad()
+    def get_temp_decoded_frame_from_latent(self,z,num_frames=None):
+        return self.vae_temp_decode(z,num_frames=num_frames).sample
 
     def encode_vae_image(self, image, do_classifier_free_guidance):
         image_latent = get_vae_latent_from_frame(image)
@@ -1043,7 +1042,7 @@ class InteractiveChatVideoGenModel(L.LightningModule):
         output_hidden_states = [row[-1]
                                 for row in b_llm_output.hidden_states[1:]]
         output_hidden_states_reshaped = []
-        for i in range(batch_size):
+        for i in range(self.batch_size):
             curr_conv = []
             for j in range(len(output_hidden_states)):
                 curr_conv.append(output_hidden_states[j][i])
@@ -1052,6 +1051,12 @@ class InteractiveChatVideoGenModel(L.LightningModule):
         output_hidden_states_reshaped = torch.stack(
             output_hidden_states_reshaped)
         return output_hidden_states_reshaped
+
+    def get_last_layer_hidden_states_from_llm_output_batched_torch(self,b_llm_output):
+        output_hidden_states = [row[-1] for row in b_llm_output.hidden_states[1:]]
+        output_hidden_states  = [tensor.to("cpu") for tensor in output_hidden_states] ## why to cpu??
+        t_output = [torch.stack(list(pair)) for pair in zip(*output_hidden_states)]
+        return t_output
 
     # Text Processing Methods
     def extract_text_after_token(self, text, token="ASSISTANT:"):
@@ -1345,24 +1350,17 @@ class InteractiveChatVideoGenModel(L.LightningModule):
         curr_batch_size = b_video_frames.shape[0]
         
         b_video_frames = b_video_frames.flatten(0, 1)
-        self.grayscale_weights = self.grayscale_weights.to(b_video_frames.device)
-
-        # Initial sharding disabled as b_video_frames is sharded later
-        # if self.tpu_mesh is not None: 
-        #     xs.mark_sharding(b_video_frames,self.tpu_mesh,('data',None,None,None))
-
-
-        ### Transforms
         
-        # Reshape and resize frames
-        b_video_frames = b_video_frames.view(-1, 3, 256, 256)
-        b_video_frames = F.interpolate(b_video_frames, size=(self.latent_size, self.latent_size), mode='bilinear', align_corners=False)
+        if self.tpu_mesh is not None:
+            xs.mark_sharding(b_video_frames,self.tpu_mesh,('data',None,None,None))
+        
 
-        # Convert to grayscale
-        b_video_frames = (b_video_frames * self.grayscale_weights).sum(dim=1, keepdim=True)
+        b_video_frame_latents = self.get_vae_latent_from_frame(b_video_frames)
+        
+        del b_video_frames
 
-        b_video_frames = b_video_frames.view(curr_batch_size, int(
-            b_video_frames.shape[0]/curr_batch_size), *b_video_frames.shape[1:])
+        b_video_frame_latents = b_video_frame_latents.view(curr_batch_size, int(
+            b_video_frame_latents.shape[0]/curr_batch_size), *b_video_frame_latents.shape[1:])
 
         curr_batch_size = b_llm_hidden_states.shape[0]
         
@@ -1375,12 +1373,12 @@ class InteractiveChatVideoGenModel(L.LightningModule):
 
         bridge_net_op = bridge_net_op.view(curr_batch_size, int(
             bridge_net_op.shape[0]/curr_batch_size), *bridge_net_op.shape[1:])
-
-        b_video_frames = rearrange(b_video_frames,'b t c h w -> b c t h w') # Very IMP VideoCrafter UNet expects in this format
+            
+        b_video_frame_latents = rearrange(b_video_frame_latents,'b t c h w -> b c t h w') # Very IMP VideoCrafter UNet expects in this format
 
         # print(f'{b_video_frame_latents.shape}')
         
-        noise_pred,noise = self.train_unet(b_video_frames,bridge_net_op,curr_batch_size=curr_batch_size)
+        noise_pred,noise = self.train_unet(b_video_frame_latents,bridge_net_op,curr_batch_size=curr_batch_size)
         
         loss = F.mse_loss(noise_pred, noise)
 
@@ -1389,30 +1387,22 @@ class InteractiveChatVideoGenModel(L.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        
         b_video_frames, b_llm_hidden_states = batch
  
         curr_batch_size = b_video_frames.shape[0]
         
         b_video_frames = b_video_frames.flatten(0, 1)
-        self.grayscale_weights = self.grayscale_weights.to(b_video_frames.device)
-
-        # Initial sharding disabled as b_video_frames is sharded later
-        # if self.tpu_mesh is not None: 
-        #     xs.mark_sharding(b_video_frames,self.tpu_mesh,('data',None,None,None))
-
-
-        ### Transforms
         
-        # Reshape and resize frames
-        b_video_frames = b_video_frames.view(-1, 3, 256, 256)
-        b_video_frames = F.interpolate(b_video_frames, size=(self.latent_size, self.latent_size), mode='bilinear', align_corners=False)
+        if self.tpu_mesh is not None:
+            xs.mark_sharding(b_video_frames,self.tpu_mesh,('data',None,None,None))
+        
 
-        # Convert to grayscale
-        b_video_frames = (b_video_frames * self.grayscale_weights).sum(dim=1, keepdim=True)
+        b_video_frame_latents = self.get_vae_latent_from_frame(b_video_frames)
+        
+        del b_video_frames
 
-        b_video_frames = b_video_frames.view(curr_batch_size, int(
-            b_video_frames.shape[0]/curr_batch_size), *b_video_frames.shape[1:])
+        b_video_frame_latents = b_video_frame_latents.view(curr_batch_size, int(
+            b_video_frame_latents.shape[0]/curr_batch_size), *b_video_frame_latents.shape[1:])
 
         curr_batch_size = b_llm_hidden_states.shape[0]
         
@@ -1425,16 +1415,14 @@ class InteractiveChatVideoGenModel(L.LightningModule):
 
         bridge_net_op = bridge_net_op.view(curr_batch_size, int(
             bridge_net_op.shape[0]/curr_batch_size), *bridge_net_op.shape[1:])
-
-        b_video_frames = rearrange(b_video_frames,'b t c h w -> b c t h w') # Very IMP VideoCrafter UNet expects in this format
-
-        # print(f'{b_video_frame_latents.shape}')
         
-        noise_pred,noise = self.train_unet(b_video_frames,bridge_net_op,curr_batch_size=curr_batch_size)
+        b_video_frame_latents = rearrange(b_video_frame_latents,'b t c h w -> b c t h w')
+
+        noise_pred,noise = self.train_unet(b_video_frame_latents,bridge_net_op,curr_batch_size=curr_batch_size)
         
         loss = F.mse_loss(noise_pred, noise)
 
-        self.log(f"Training Loss", loss.detach())
+        self.log(f"Validation Loss", loss.detach())
         
         return loss
 
@@ -1442,12 +1430,6 @@ class InteractiveChatVideoGenModel(L.LightningModule):
         #params=list(self.unetspatiotemporalconditionmodel.parameters())+list(self.bridge_mlp.parameters())
         params = list(self.unet.parameters())+list(self.bridge_mlp.parameters())
         return torch.optim.AdamW(params, lr=self.basic_lr, weight_decay=self.weight_decay, betas=self.betas)
-
-    def get_last_layer_hidden_states_from_llm_output_batched_torch(self,b_llm_output):
-        output_hidden_states = [row[-1] for row in b_llm_output.hidden_states[1:]]
-        output_hidden_states  = [tensor.to("cpu") for tensor in output_hidden_states] ## why to cpu??
-        t_output = [torch.stack(list(pair)) for pair in zip(*output_hidden_states)]
-        return t_output
 
 
 def batch_ddim_sampling(model, cond, noise_shape, n_samples=1, ddim_steps=50, ddim_eta=1.0,\
@@ -1488,7 +1470,7 @@ def batch_ddim_sampling(model, cond, noise_shape, n_samples=1, ddim_steps=50, dd
     for _ in range(n_samples):
         if ddim_sampler is not None:
             kwargs.update({"clean_cond": True})
-            for temp_ in ddim_sampler.sample(S=ddim_steps,
+            samples, _ = ddim_sampler.sample(S=ddim_steps,
                                             conditioning=cond,
                                             batch_size=noise_shape[0],
                                             shape=noise_shape[1:],
@@ -1500,135 +1482,122 @@ def batch_ddim_sampling(model, cond, noise_shape, n_samples=1, ddim_steps=50, dd
                                             conditional_guidance_scale_temporal=temporal_cfg_scale,
                                             x_T=x_T,
                                             **kwargs
-                                            ):
-                if type(temp_)!=int:
-                    samples, _ = temp_
-                    break
-                yield temp_
+                                            )
         ## reconstruct from latent to pixel space
         z = samples
         b, c, t, h, w = z.shape
-        # z = 1. / model.vae.config.scaling_factor * z #(-19,20)-> (-4,4)
+        z = 1. / model.vae.config.scaling_factor * z #(-19,20)-> (-4,4)
         #print(z.shape,z[:,:,0].shape)
         #sys.exit()
         z = rearrange(z,'b c t h w -> b t c h w')
-        # z = z.flatten(0,1)
-        # frames = model.get_temp_decoded_frame_from_latent(z)
-        # frames = rearrange(frames,'t c h w -> 1 c t h w')
+        z = z.flatten(0,1)
+        frames = model.get_temp_decoded_frame_from_latent(z)
+        frames = rearrange(frames,'t c h w -> 1 c t h w')
         #results = torch.cat([model.get_temp_decoded_frame_from_latent(z[:,:,i]).unsqueeze(2) for i in range(t)], dim=2)
 
         #batch_images = model.decode_first_stage_2DAE(samples)
-        batch_variants.append(z)
+        batch_variants.append(frames)
     ## batch, <samples>, c, t, h, w
     batch_variants = torch.stack(batch_variants, dim=1)
-    yield batch_variants
-
-
-def load_model(prompt,model_repo_id,model_file_name,num_inference_steps=50,fps=24,ddim_eta=1.0,unconditional_guidance_scale=1.0):
-    global int_chat_video_gen_model
-    """ Load the UNET """
-    checkpoint_path = hf_hub_download(repo_id=model_repo_id, filename=model_file_name)
-    state_dict = torch.load(checkpoint_path)
-
-    int_chat_video_gen_model = InteractiveChatVideoGenModel(
-    batch_size=TRAIN_BATCH_SIZE, use_llm=False, use_tpu_vm=False, use_xla=False)
-    
-    int_chat_video_gen_model.configure_model()    
-    int_chat_video_gen_model.load_state_dict(state_dict)    
-    int_chat_video_gen_model.latent_diffusion_model.register_schedule(given_betas=None, beta_schedule="linear", timesteps=int_chat_video_gen_model.latent_diffusion_model_config['params']['timesteps'],linear_start=int_chat_video_gen_model.latent_diffusion_model_config['params']['linear_start'], linear_end=int_chat_video_gen_model.latent_diffusion_model_config['params']['linear_end'], cosine_s=8e-3)
-
-    """ Load the MLM """
-    int_chat_video_gen_model.multimodal_llm=LlavaNextVideoForConditionalGeneration.from_pretrained(int_chat_video_gen_model.multimodal_llm_id,low_cpu_mem_usage=int_chat_video_gen_model.llm_low_mem_cpu_usage,torch_dtype=DTYPE_PT,load_in_4bit=True,device_map="auto")
-    int_chat_video_gen_model.multimodal_llm_processor = LlavaNextVideoProcessor.from_pretrained(int_chat_video_gen_model.multimodal_llm_id)
-
-    """ Move models to CUDA """
-    int_chat_video_gen_model.latent_diffusion_model=int_chat_video_gen_model.latent_diffusion_model.to("cuda")
-    int_chat_video_gen_model.bridge_mlp=int_chat_video_gen_model.bridge_mlp.to("cuda")
-
-
-int_chat_video_gen_model = None
+    return batch_variants
 
 @torch.no_grad()
-def run_latentspace_mmnist_inference(prompt,model_repo_id,model_file_name,num_inference_steps=50,fps=24,ddim_eta=1.0,unconditional_guidance_scale=1.0,digit=1):
-    global int_chat_video_gen_model
-    if int_chat_video_gen_model is None:
-        print("First run, loading model...")
-        load_model(prompt,model_repo_id,model_file_name,num_inference_steps=50,fps=24,ddim_eta=1.0,unconditional_guidance_scale=1.0)
+def load_model(repo_id=model_repo_id, filename=model_file_name):
+    global latentspace_mmnist_model
+    
+    checkpoint_path = hf_hub_download(repo_id=model_repo_id, filename=model_file_name)
 
-    print("Performing Inference...")
+    print(checkpoint_path)
+
+    state_dict = torch.load(checkpoint_path)
+
+
+    latentspace_mmnist_model = InteractiveChatVideoGenModel(
+    batch_size=TRAIN_BATCH_SIZE, use_llm=False, use_tpu_vm=False, use_xla=False,use_vae=True)
+
+    latentspace_mmnist_model.configure_model()
+
+    latentspace_mmnist_model.load_state_dict(state_dict)
+
+    #print(latentspace_mmnist_model.latent_diffusion_model.alphas_cumprod)
+
+    latentspace_mmnist_model.latent_diffusion_model.register_schedule(given_betas=None, beta_schedule="linear", timesteps=latentspace_mmnist_model.latent_diffusion_model_config['params']['timesteps'],linear_start=latentspace_mmnist_model.latent_diffusion_model_config['params']['linear_start'], linear_end=latentspace_mmnist_model.latent_diffusion_model_config['params']['linear_end'], cosine_s=8e-3)
+
+    #print(latentspace_mmnist_model.latent_diffusion_model.alphas_cumprod)
+
+
+    #sys.exit()
+    
+    latentspace_mmnist_model.multimodal_llm=LlavaNextVideoForConditionalGeneration.from_pretrained(latentspace_mmnist_model.multimodal_llm_id,torch_dtype=DTYPE_PT,load_in_4bit=True,device_map="cuda:0")
+
+    latentspace_mmnist_model.multimodal_llm_processor = LlavaNextVideoProcessor.from_pretrained(latentspace_mmnist_model.multimodal_llm_id)
+    
+
+latentspace_mmnist_model = None
+@torch.no_grad()
+def run_latentspace_mmnist_inference(prompt,model_repo_id,model_file_name,num_inference_steps=50,fps=24,ddim_eta=1.0,unconditional_guidance_scale=1.0):
+    global latentspace_mmnist_model
+    
+    if latentspace_mmnist_model is None:
+        print("Loading model first run")
+        load_model()
+
     b_text_description=[prompt]
 
-    b_llm_text_input = [int_chat_video_gen_model.get_next_conversation_prompt_from_conversation([],text_desc,initial_prompt=True) for text_desc in b_text_description]
-    b_llm_input_processed = int_chat_video_gen_model.multimodal_llm_processor([elem[1] for elem in b_llm_text_input],padding=True, return_tensors="pt")
-    b_llm_output = int_chat_video_gen_model.multimodal_llm.generate(b_llm_input_processed['input_ids'],return_dict_in_generate=True,output_hidden_states=True, max_new_tokens=MAX_WORD_COUNT_LIMIT, do_sample=False)
-    b_llm_hidden_states =  int_chat_video_gen_model.get_last_layer_hidden_states_from_llm_output_batched_torch(b_llm_output)[0]
+    b_llm_text_input = [latentspace_mmnist_model.get_next_conversation_prompt_from_conversation([],text_desc,initial_prompt=True) for text_desc in b_text_description]
+
+    b_llm_input_processed = latentspace_mmnist_model.multimodal_llm_processor([elem[1] for elem in b_llm_text_input],padding=True, return_tensors="pt")
+
+    b_llm_output = latentspace_mmnist_model.multimodal_llm.generate(b_llm_input_processed['input_ids'],return_dict_in_generate=True,output_hidden_states=True, max_new_tokens=MAX_WORD_COUNT_LIMIT, do_sample=False)
+
+    b_llm_hidden_states =  latentspace_mmnist_model.get_last_layer_hidden_states_from_llm_output_batched_torch(b_llm_output)[0]
     
     b_llm_hidden_states=b_llm_hidden_states.flatten(0,1)
+
+    latentspace_mmnist_model.latent_diffusion_model=latentspace_mmnist_model.latent_diffusion_model.to("cuda")
+    
+    latentspace_mmnist_model.bridge_mlp=latentspace_mmnist_model.bridge_mlp.to("cuda")
+
+    latentspace_mmnist_model.vae=latentspace_mmnist_model.vae.to("cuda")
+
     b_llm_hidden_states=b_llm_hidden_states.to("cuda")
-    bridge_net_op=int_chat_video_gen_model.bridge_mlp(b_llm_hidden_states)
+
+    bridge_net_op=latentspace_mmnist_model.bridge_mlp(b_llm_hidden_states)
+
     bridge_net_op=bridge_net_op.unsqueeze(0)
 
     #print(f'{bridge_net_op.shape}')
 
     #sys.exit()
 
-    int_chat_video_gen_model.batch_size=1
+    latentspace_mmnist_model.batch_size=1
 
-    int_chat_video_gen_model.eval()
+    latentspace_mmnist_model.eval()
 
-    noise_shape = [int_chat_video_gen_model.batch_size, 1, int_chat_video_gen_model.num_frames, int_chat_video_gen_model.latent_size, int_chat_video_gen_model.latent_size]
+    noise_shape = [latentspace_mmnist_model.batch_size, latentspace_mmnist_model.latent_diffusion_model.channels, latentspace_mmnist_model.num_frames, latentspace_mmnist_model.latent_size, latentspace_mmnist_model.latent_size]
         
     cond = {"c_crossattn": [bridge_net_op], "fps": fps}
 
-    for _ in  batch_ddim_sampling(int_chat_video_gen_model, cond, noise_shape, 1, \
-                                                num_inference_steps, ddim_eta, unconditional_guidance_scale):
-        if type(_)!=int:
-            batch_samples = _
-            break
-        yield _
+    batch_samples = batch_ddim_sampling(latentspace_mmnist_model, cond, noise_shape, 1, \
+                                                num_inference_steps, ddim_eta, unconditional_guidance_scale)
         
+    save_videos(batch_samples, './', [f'{prompt[:10]}_is_{num_inference_steps}_cfg_{unconditional_guidance_scale}_eta_{ddim_eta}'], fps=8)
 
-    frames_bw = batch_samples[0][0]
-    m, M = frames_bw.min(), frames_bw.max()
-    frames_bw = (frames_bw - m) / (M - m)
-    frames_bw = frames_bw*255
-    frames_bw_np = frames_bw.squeeze(1).cpu().numpy().astype(np.uint8)
+if __name__=="__main__":
+    text_prompt="A digit 3 is on the first frame.The digit 3 consistently moves right by 1.0 pixels and upwards by 1.0 pixels, rotates by 0.0 degrees, and remains the same size."
+    model_repo_id="Hemabhushan/capstone_model"
+    model_file_name="pytorch_model_unet_cross_attn_192_temp_decoder_ddim_initial_frames_eph_8_mmnist_easy.bin"
+    num_inference_steps=500
+    fps=24
+    ddim_eta=1.0
+    unconditional_guidance_scale=8.0
 
-    output_width, output_height = 512, 512
+    l_num_inference_steps = [50,100,200]
+    l_unconditional_guidance_scale = [8.0]
 
-    upscaled_frames = []
-
-    print(frames_bw_np.shape,"SHAPE BEFORE FOR")
-    # Upscale each frame
-    for i in range(frames_bw_np.shape[0]):
-        frame_np = frames_bw_np[i]  # shape [32, 32] as a numpy array
-
-        # Resize the frame to the desired output resolution
-        upscaled_frame = cv2.resize(frame_np, (output_width, output_height), interpolation=cv2.INTER_LANCZOS4)
-
-        # Convert back to tensor and add the channel dimension to match [512, 512, 1]
-        tmp = torch.from_numpy(upscaled_frame)
-        upscaled_frames.append(tmp)
-
-    # Stack upscaled frames to create a single tensor of shape [16, 512, 512, 3]
-    upscaled_frames_tensor = torch.stack(upscaled_frames)
-    print(upscaled_frames_tensor.shape)  
+    for i,i_steps in enumerate(l_num_inference_steps):
+        for j,cfg_scale in enumerate(l_unconditional_guidance_scale):
+            
+            run_inference(text_prompt,model_repo_id,model_file_name,i_steps,fps,ddim_eta,cfg_scale)
     
-    import torchvision.io as io
-
-    # Save as video file (e.g., "output.mp4") at 8 frames per second
-    output_path = f"/kaggle/working/Imagine-Gen-Inference-UI/outputs/output_{num_inference_steps}_cfgs_{unconditional_guidance_scale}_{prompt}.mp4"
-    io.write_video(output_path, upscaled_frames_tensor, fps=8)
-    print(output_path)
-    yield output_path
-
-# if __name__=="__main__":
-#     text_prompt="A digit 3 is on the first frame.The digit 3 consistently moves right by 1.0 pixels and upwards by 1.0 pixels, rotates by 0.0 degrees, and remains the same size."
-#     model_repo_id="Hemabhushan/capstone_model"
-#     model_file_name="pytorch_model_unet_cross_attn_192_temp_decoder_ddim_initial_frames_res-reduction_bw_eph_0_mmnist_easy_pixelspace.bin"
-#     num_inference_steps=300
-#     fps=24
-#     ddim_eta=1.0
-#     unconditional_guidance_scale=1.0
-    
-#     run__pixelspace_inference(text_prompt,model_repo_id,model_file_name,num_inference_steps,fps,ddim_eta,unconditional_guidance_scale)
+    # run_inference(text_prompt,model_repo_id,model_file_name,num_inference_steps,fps,ddim_eta,unconditional_guidance_scale)

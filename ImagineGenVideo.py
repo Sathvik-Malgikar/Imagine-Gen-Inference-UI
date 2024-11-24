@@ -22,7 +22,18 @@ import base64
 
 runners_list = ["Pixel space(no vae)","Temporal Decoder","FLUX VAE","DUMMY runner", "AE","Simple Description"]
 
+
 selected_runner = st.selectbox("Select a runner based on VAE used.", tuple(runners_list))
+
+if selected_runner == "Pixel space(no vae)":
+    default_model_file = "pytorch_model_unet_cross_attn_192_temp_decoder_ddim_initial_frames_res-reduction_bw_eph_2_mmnist_easy_pixelspace.bin"
+elif selected_runner == "Temporal Decoder":
+    default_model_file = "pytorch_model_unet_cross_attn_192_temp_decoder_ddim_optical_flow_eph_8_sakuga.bin"
+elif selected_runner == "Simple Description":
+    default_model_file = "pytorch_model_unet_cross_attn_192_tmp_dcd_bridge_ae_simple_desc_ddim_optical_flow_eph_1_sakuga.bin"
+else:
+    default_model_file = "placeholder.bin"
+    
 
 inference_steps = int(st.text_input("Enter Inference steps",value = 1))
 model_file_name = (st.text_input("Enter Model file name",value="pytorch_model_unet_cross_attn_192_temp_decoder_ddim_initial_frames_res-reduction_bw_eph_2_mmnist_easy_pixelspace.bin"))

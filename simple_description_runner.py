@@ -1685,7 +1685,7 @@ def run_simple_desc_inference(prompt, model_repo_id,model_file_name,num_inferenc
     batch_samples = batch_ddim_sampling(simple_int_gen_model, cond, noise_shape, 1, \
                                                 num_inference_steps, ddim_eta, unconditional_guidance_scale)
     print("got batch samples")    
-    save_videos(batch_samples, '/kaggle/working/Imagine-Gen-Inference-UI/', [f'{prompt[:10]}_is_{num_inference_steps}_cfg_{unconditional_guidance_scale}_eta_{ddim_eta}_{prompt}'], fps=8)
+    save_videos(batch_samples, '/kaggle/working/Imagine-Gen-Inference-UI/outputs/', [f'{prompt[:10]}_is_{num_inference_steps}_cfg_{unconditional_guidance_scale}_eta_{ddim_eta}_{prompt}'], fps=8)
     print("Saved video")
     return "/kaggle/working/Imagine-Gen-Inference-UI/outputs/" + f'{prompt[:10]}_is_{num_inference_steps}_cfg_{unconditional_guidance_scale}_eta_{ddim_eta}_{prompt}' + ".mp4"
     

@@ -35,7 +35,7 @@ from datasets.formatting.formatting import PythonFormatter, TensorFormatter
 from datasets.formatting import get_format_type_from_alias, get_formatter
 
 sys.path.append('/kaggle/working/VideoCrafter')
-print("DEEBUG",sys.path)
+# print("DEEBUG",sys.path)
 
 ## VideoCrafter Specific Imports
 from omegaconf import OmegaConf

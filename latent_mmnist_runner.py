@@ -1540,7 +1540,7 @@ def run_latentspace_mmnist_inference(prompt,model_repo_id,model_file_name,num_in
     
     if latentspace_mmnist_model is None:
         print("Loading model first run")
-        load_model()
+        load_model(model_repo_id,model_file_name)
 
     b_text_description=[prompt]
 

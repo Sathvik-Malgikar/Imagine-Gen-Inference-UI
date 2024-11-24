@@ -1600,11 +1600,6 @@ def load_model(model_repo_id,model_file_name):
     #print(simple_int_gen_model.latent_diffusion_model.alphas_cumprod)
 
     simple_int_gen_model.latent_diffusion_model.register_schedule(given_betas=None, beta_schedule="linear", timesteps=simple_int_gen_model.latent_diffusion_model_config['params']['timesteps'],linear_start=simple_int_gen_model.latent_diffusion_model_config['params']['linear_start'], linear_end=simple_int_gen_model.latent_diffusion_model_config['params']['linear_end'], cosine_s=8e-3)
-
-    print(simple_int_gen_model.latent_diffusion_model.alphas_cumprod)
-
-
-    sys.exit()
     
     simple_int_gen_model.multimodal_llm=LlavaNextVideoForConditionalGeneration.from_pretrained(simple_int_gen_model.multimodal_llm_id,torch_dtype=DTYPE_PT,load_in_4bit=True,device_map="cuda:0")
 

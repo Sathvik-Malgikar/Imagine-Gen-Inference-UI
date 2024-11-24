@@ -34,7 +34,7 @@ from datasets.features.features import FeatureType, _align_features, _check_if_f
 from datasets.formatting.formatting import PythonFormatter, TensorFormatter
 from datasets.formatting import get_format_type_from_alias, get_formatter
 
-sys.path.append('/teamspace/studios/this_studio/INFERENCE_UI/VideoCrafter')
+sys.path.append('/kaggle/working/Imagine-Gen-Inference-UI/VideoCrafter')
 # print("DEEBUG",sys.path)
 
 
@@ -786,7 +786,7 @@ class InteractiveChatVideoGenModel(L.LightningModule):
             fsdp_auto_wrap_policy=None, 
             shard_output_callback=None, 
             use_xla=False,
-            yaml_config_file_path='/teamspace/studios/this_studio/INFERENCE_UI/VideoCrafter/configs/inference_t2v_512_v2.0.yaml'):
+            yaml_config_file_path='/kaggle/working/Imagine-Gen-Inference-UI/VideoCrafter/configs/inference_t2v_512_v2.0.yaml'):
             
         super(InteractiveChatVideoGenModel, self).__init__()
         self.height = height
@@ -827,7 +827,7 @@ class InteractiveChatVideoGenModel(L.LightningModule):
         self.bridge_mlp = None
         self.tpu_mesh=tpu_mesh
         
-        config = OmegaConf.load('/teamspace/studios/this_studio/INFERENCE_UI/VideoCrafter/configs/inference_t2v_512_v2.0.yaml')
+        config = OmegaConf.load('/kaggle/working/Imagine-Gen-Inference-UI/VideoCrafter/configs/inference_t2v_512_v2.0.yaml')
         model_config = config.pop("model", OmegaConf.create())
         
         self.latent_diffusion_model_config = model_config

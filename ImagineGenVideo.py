@@ -5,7 +5,7 @@ from temporal_decoder_runner import run_temporal_decoder_inference
 from pixelspace_runner import run_pixelspace_inference
 from dummy_runner import dummy_runner_inference
 from simple_description_runner import run_simple_desc_inference
-from moviepy.editor import VideoFileClip, concatenate_videoclips
+from moviepy import VideoFileClip, concatenate_videoclips
 
 st.title("Welcome to ImagineGen Video generator !")
 
@@ -28,7 +28,7 @@ inference_steps = int(st.text_input("Enter Inference steps",value = 1))
 model_file_name = (st.text_input("Enter Model file name",value="pytorch_model_unet_cross_attn_192_temp_decoder_ddim_initial_frames_res-reduction_bw_eph_2_mmnist_easy_pixelspace.bin"))
 cfg_scale = float(st.text_input("Enter Unconditional Guidance Scale",value = 1.0))
 
-output_path = "/teamspace/studios/this_studio/INFERENCE_UI/outputs/IMAGINE_GEN_GENERATED_VIDEO.mp4"
+output_path = "/kaggle/working/Imagine-Gen-Inference-UI/outputs/IMAGINE_GEN_GENERATED_VIDEO.mp4"
 
 if "path_array" not in st.session_state:
     st.session_state.path_array=[]

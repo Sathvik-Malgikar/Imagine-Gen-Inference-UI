@@ -34,7 +34,7 @@ from datasets.features.features import FeatureType, _align_features, _check_if_f
 from datasets.formatting.formatting import PythonFormatter, TensorFormatter
 from datasets.formatting import get_format_type_from_alias, get_formatter
 
-sys.path.append('/teamspace/studios/this_studio/INFERENCE_UI/VideoCrafter')
+sys.path.append('/kaggle/working/Imagine-Gen-Inference-UI/VideoCrafter')
 
 
 ## VideoCrafter Specific Imports
@@ -665,7 +665,7 @@ class DDIMSampler(object):
             pred_x0, _, *_ = self.model.first_stage_model.quantize(pred_x0)
         # direction pointing to x_t
 
-        with open('/teamspace/studios/this_studio/INFERENCE_UI/debug3.txt','a') as f:
+        with open('/kaggle/working/Imagine-Gen-Inference-UI/debug3.txt','a') as f:
             f.write(f'sigma_t {sigma_t} sigmas {sigmas[index]} e_t {e_t}')
         
         #if index==0:
@@ -678,7 +678,7 @@ class DDIMSampler(object):
             noise = torch.nn.functional.dropout(noise, p=noise_dropout)
         
         alphas = self.model.alphas_cumprod if use_original_steps else self.ddim_alphas
-        with open('/teamspace/studios/this_studio/INFERENCE_UI/debug2.txt','a') as f:
+        with open('/kaggle/working/Imagine-Gen-Inference-UI/debug2.txt','a') as f:
             f.write(f'a_prev {a_prev} dir_xt {dir_xt} noise {noise}')
         if self.use_scale:
             scale_arr = self.model.scale_arr if use_original_steps else self.ddim_scale_arr
@@ -691,7 +691,7 @@ class DDIMSampler(object):
             print('no scale')
             x_prev = a_prev.sqrt() * pred_x0 + dir_xt + noise
 
-        with open('/teamspace/studios/this_studio/INFERENCE_UI/debug.txt','a') as f:
+        with open('/kaggle/working/Imagine-Gen-Inference-UI/debug.txt','a') as f:
             f.write(f'x_prev {x_prev} pred_x0 {pred_x0}')
         return x_prev, pred_x0
 
@@ -754,7 +754,7 @@ DTYPE_PT = torch.float32
 EMBEDDING_DIMENSION = 4096
 CROSS_ATTN_TEXT_CONTEXT_LEN = MAX_WORD_COUNT_LIMIT
 
-with open('/teamspace/studios/this_studio/INFERENCE_UI/VideoCrafter/.env','w') as f:
+with open('/kaggle/working/Imagine-Gen-Inference-UI/VideoCrafter/.env','w') as f:
     env_str=f'CROSS_ATTN_TEXT_CONTEXT_LEN = {CROSS_ATTN_TEXT_CONTEXT_LEN}'
     f.write(env_str)
 
@@ -830,7 +830,7 @@ class InteractiveChatVideoGenModel(L.LightningModule):
             fsdp_auto_wrap_policy=None, 
             shard_output_callback=None, 
             use_xla=False,
-            yaml_config_file_path='/teamspace/studios/this_studio/INFERENCE_UI/VideoCrafter/configs/inference_t2v_512_v2.0.yaml'):
+            yaml_config_file_path='/kaggle/working/Imagine-Gen-Inference-UI/VideoCrafter/configs/inference_t2v_512_v2.0.yaml'):
             
         super(InteractiveChatVideoGenModel, self).__init__()
         self.height = height
@@ -1679,9 +1679,9 @@ def run_simple_desc_inference(prompt,int_chat_video_gen_model, model_repo_id,mod
     batch_samples = batch_ddim_sampling(int_chat_video_gen_model, cond, noise_shape, 1, \
                                                 num_inference_steps, ddim_eta, unconditional_guidance_scale)
     print("got batch samples")    
-    save_videos(batch_samples, '/teamspace/studios/this_studio/INFERENCE_UI/', [f'{prompt[:10]}_is_{num_inference_steps}_cfg_{unconditional_guidance_scale}_eta_{ddim_eta}_{prompt}'], fps=8)
+    save_videos(batch_samples, '/kaggle/working/Imagine-Gen-Inference-UI/', [f'{prompt[:10]}_is_{num_inference_steps}_cfg_{unconditional_guidance_scale}_eta_{ddim_eta}_{prompt}'], fps=8)
     print("Saved video")
-    return "/teamspace/studios/this_studio/INFERENCE_UI/outputs/" + f'{prompt[:10]}_is_{num_inference_steps}_cfg_{unconditional_guidance_scale}_eta_{ddim_eta}_{prompt}' + ".mp4"
+    return "/kaggle/working/Imagine-Gen-Inference-UI/outputs/" + f'{prompt[:10]}_is_{num_inference_steps}_cfg_{unconditional_guidance_scale}_eta_{ddim_eta}_{prompt}' + ".mp4"
     
 if __name__=="__main__":
     #text_prompt="A majestic fantasy castle with a grand fountain and ornate architecture under a blue sky, in a city with ocean views."

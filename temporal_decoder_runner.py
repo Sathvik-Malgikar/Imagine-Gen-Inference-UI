@@ -1506,6 +1506,7 @@ def batch_ddim_sampling(model, cond, noise_shape, n_samples=1, ddim_steps=50, dd
 def load_model(model_repo_id,model_file_name):
     global temporal_int_gen_model
     """ Load the UNET """
+    login("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")
     checkpoint_path = hf_hub_download(repo_id=model_repo_id, filename=model_file_name)
 
     print(checkpoint_path)

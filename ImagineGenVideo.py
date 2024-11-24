@@ -1,4 +1,3 @@
-import sys
 
 import streamlit as st
 from temporal_decoder_runner import run_temporal_decoder_inference

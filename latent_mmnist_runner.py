@@ -12,7 +12,7 @@ from collections import Counter
 from io import BytesIO
 import requests
 import tempfile
-import moviepy.editor as mp
+import moviepy as mp
 import lightning as L
 from tqdm import tqdm
 import tqdm.notebook as tq
@@ -34,7 +34,7 @@ from datasets.features.features import FeatureType, _align_features, _check_if_f
 from datasets.formatting.formatting import PythonFormatter, TensorFormatter
 from datasets.formatting import get_format_type_from_alias, get_formatter
 
-sys.path.append('./VideoCrafter')
+sys.path.append('/kaggle/working/VideoCrafter')
 
 
 ## VideoCrafter Specific Imports
@@ -665,7 +665,7 @@ class DDIMSampler(object):
             pred_x0, _, *_ = self.model.first_stage_model.quantize(pred_x0)
         # direction pointing to x_t
 
-        with open('./debug3.txt','a') as f:
+        with open('/kaggle/working/debug3.txt','a') as f:
             f.write(f'sigma_t {sigma_t} sigmas {sigmas[index]} e_t {e_t}')
         
         #if index==0:
@@ -678,7 +678,7 @@ class DDIMSampler(object):
             noise = torch.nn.functional.dropout(noise, p=noise_dropout)
         
         alphas = self.model.alphas_cumprod if use_original_steps else self.ddim_alphas
-        with open('./debug2.txt','a') as f:
+        with open('/kaggle/working/debug2.txt','a') as f:
             f.write(f'a_prev {a_prev} dir_xt {dir_xt} noise {noise}')
         if self.use_scale:
             scale_arr = self.model.scale_arr if use_original_steps else self.ddim_scale_arr
@@ -691,7 +691,7 @@ class DDIMSampler(object):
             print('no scale')
             x_prev = a_prev.sqrt() * pred_x0 + dir_xt + noise
 
-        with open('./debug.txt','a') as f:
+        with open('/kaggle/working/debug.txt','a') as f:
             f.write(f'x_prev {x_prev} pred_x0 {pred_x0}')
         return x_prev, pred_x0
 
@@ -781,7 +781,7 @@ class InteractiveChatVideoGenModel(L.LightningModule):
             fsdp_auto_wrap_policy=None, 
             shard_output_callback=None, 
             use_xla=False,
-            yaml_config_file_path='./VideoCrafter/configs/inference_t2v_512_v2.0.yaml'):
+            yaml_config_file_path='/kaggle/working/VideoCrafter/configs/inference_t2v_512_v2.0.yaml'):
             
         super(InteractiveChatVideoGenModel, self).__init__()
         self.height = height
@@ -1581,7 +1581,8 @@ def run_latentspace_mmnist_inference(prompt,model_repo_id,model_file_name,num_in
     batch_samples = batch_ddim_sampling(latentspace_mmnist_model, cond, noise_shape, 1, \
                                                 num_inference_steps, ddim_eta, unconditional_guidance_scale)
         
-    save_videos(batch_samples, './', [f'{prompt[:10]}_is_{num_inference_steps}_cfg_{unconditional_guidance_scale}_eta_{ddim_eta}'], fps=8)
+    save_videos(batch_samples, '/kaggle/working/Imagine-Gen-Inference-UI/outputs/', [f'{prompt[:10]}_is_{num_inference_steps}_cfg_{unconditional_guidance_scale}_eta_{ddim_eta}_{prompt}'], fps=8)
+    return '/kaggle/working/Imagine-Gen-Inference-UI/outputs/', f'{prompt[:10]}_is_{num_inference_steps}_cfg_{unconditional_guidance_scale}_eta_{ddim_eta}_{prompt}' + ".mp4"
 
 if __name__=="__main__":
     text_prompt="A digit 3 is on the first frame.The digit 3 consistently moves right by 1.0 pixels and upwards by 1.0 pixels, rotates by 0.0 degrees, and remains the same size."

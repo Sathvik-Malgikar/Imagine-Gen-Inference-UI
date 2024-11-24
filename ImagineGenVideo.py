@@ -39,7 +39,7 @@ else:
 
 inference_steps = int(st.text_input("Enter Inference steps",value = 1))
 model_file_name = (st.text_input("Enter Model file name",value=default_model_file))
-cfg_scale = float(st.text_input("Enter Unconditional Guidance Scale",value = 1.0))
+cfg_scale = float(st.text_input("Enter Unconditional Guidance Scale",value = 3.0))
 
 output_path = "/kaggle/working/Imagine-Gen-Inference-UI/outputs/IMAGINE_GEN_GENERATED_VIDEO.mp4"
 

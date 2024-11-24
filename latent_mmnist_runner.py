@@ -504,7 +504,7 @@ class DDIMSampler(object):
             size = (batch_size, C, T, H, W)
         # print(f'Data shape for DDIM sampling is {size}, eta {eta}')
         
-        samples, intermediates = self.ddim_sampling(conditioning, size,
+        for temp_ in self.ddim_sampling(conditioning, size,
                                                     callback=callback,
                                                     img_callback=img_callback,
                                                     quantize_denoised=quantize_x0,
@@ -519,8 +519,12 @@ class DDIMSampler(object):
                                                     unconditional_guidance_scale=unconditional_guidance_scale,
                                                     unconditional_conditioning=unconditional_conditioning,
                                                     verbose=verbose,
-                                                    **kwargs)
-        return samples, intermediates
+                                                    **kwargs):
+            if type(temp_)!=int:
+                samples, intermediates = temp_
+                break
+            yield temp_
+        yield samples, intermediates
 
     @torch.no_grad()
     def ddim_sampling(self, cond, shape,
@@ -599,8 +603,8 @@ class DDIMSampler(object):
             if index % log_every_t == 0 or index == total_steps - 1:
                 intermediates['x_inter'].append(img)
                 intermediates['pred_x0'].append(pred_x0)
-
-        return img, intermediates
+            yield i
+        yield img, intermediates
 
     @torch.no_grad()
     def p_sample_ddim(self, x, c, t, index, repeat_noise=False, use_original_steps=False, quantize_denoised=False,
@@ -1470,7 +1474,7 @@ def batch_ddim_sampling(model, cond, noise_shape, n_samples=1, ddim_steps=50, dd
     for _ in range(n_samples):
         if ddim_sampler is not None:
             kwargs.update({"clean_cond": True})
-            samples, _ = ddim_sampler.sample(S=ddim_steps,
+            for temp_ in ddim_sampler.sample(S=ddim_steps,
                                             conditioning=cond,
                                             batch_size=noise_shape[0],
                                             shape=noise_shape[1:],
@@ -1482,7 +1486,11 @@ def batch_ddim_sampling(model, cond, noise_shape, n_samples=1, ddim_steps=50, dd
                                             conditional_guidance_scale_temporal=temporal_cfg_scale,
                                             x_T=x_T,
                                             **kwargs
-                                            )
+                                            ):
+                if type(temp_)!=int:
+                    samples,_  = temp_
+                    break
+                yield temp_
         ## reconstruct from latent to pixel space
         z = samples
         b, c, t, h, w = z.shape
@@ -1499,7 +1507,7 @@ def batch_ddim_sampling(model, cond, noise_shape, n_samples=1, ddim_steps=50, dd
         batch_variants.append(frames)
     ## batch, <samples>, c, t, h, w
     batch_variants = torch.stack(batch_variants, dim=1)
-    return batch_variants
+    yield batch_variants
 
 @torch.no_grad()
 def load_model(model_repo_id, model_file_name):
@@ -1578,11 +1586,14 @@ def run_latentspace_mmnist_inference(prompt,model_repo_id,model_file_name,num_in
         
     cond = {"c_crossattn": [bridge_net_op], "fps": fps}
 
-    batch_samples = batch_ddim_sampling(latentspace_mmnist_model, cond, noise_shape, 1, \
-                                                num_inference_steps, ddim_eta, unconditional_guidance_scale)
+    for temp_ in   batch_ddim_sampling(latentspace_mmnist_model, cond, noise_shape, 1,num_inference_steps, ddim_eta, unconditional_guidance_scale):
+        if type(temp_)!=int:
+            batch_samples = temp_
+            break
+        yield temp_
         
     save_videos(batch_samples, '/kaggle/working/Imagine-Gen-Inference-UI/outputs/', [f'{prompt[:10]}_is_{num_inference_steps}_cfg_{unconditional_guidance_scale}_eta_{ddim_eta}_{prompt}'], fps=8)
-    return '/kaggle/working/Imagine-Gen-Inference-UI/outputs/', f'{prompt[:10]}_is_{num_inference_steps}_cfg_{unconditional_guidance_scale}_eta_{ddim_eta}_{prompt}' + ".mp4"
+    yield '/kaggle/working/Imagine-Gen-Inference-UI/outputs/' + f'{prompt[:10]}_is_{num_inference_steps}_cfg_{unconditional_guidance_scale}_eta_{ddim_eta}_{prompt}' + ".mp4"
 
 if __name__=="__main__":
     text_prompt="A digit 3 is on the first frame.The digit 3 consistently moves right by 1.0 pixels and upwards by 1.0 pixels, rotates by 0.0 degrees, and remains the same size."

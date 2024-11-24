@@ -1616,7 +1616,7 @@ def run_pixelspace_inference(prompt,model_repo_id,model_file_name,num_inference_
     import torchvision.io as io
 
     # Save as video file (e.g., "output.mp4") at 8 frames per second
-    output_path = f"./outputs/output_{num_inference_steps}_cfgs_{unconditional_guidance_scale}.mp4"
+    output_path = f"/kaggle/working/Imagine-Gen-Inference-UI/outputs/output_{num_inference_steps}_cfgs_{unconditional_guidance_scale}_{prompt}.mp4"
     io.write_video(output_path, upscaled_frames_tensor, fps=8)
     print(output_path)
     yield output_path

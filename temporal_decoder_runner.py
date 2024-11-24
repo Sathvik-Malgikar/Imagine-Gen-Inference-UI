@@ -1584,7 +1584,7 @@ def run_temporal_decoder_inference(prompt,model_repo_id,model_file_name,num_infe
     saved_file_name = f'{prompt[:10]}_is_{num_inference_steps}_cfg_{unconditional_guidance_scale}_eta_{ddim_eta}'
     save_videos(batch_samples, './outputs/', [saved_file_name], fps=8)
 
-    return "./outputs/" + saved_file_name 
+    return "/kaggle/working/Imagine-Gen-Inference-UI/outputs/" + saved_file_name 
 
 if __name__=="__main__":
     text_prompt="A walking boy in black background"

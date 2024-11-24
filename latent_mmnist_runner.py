@@ -1598,6 +1598,7 @@ def run_latentspace_mmnist_inference(prompt,model_repo_id,model_file_name,num_in
 
     upscaled_frames = []
 
+    print(frames_bw_np.shape,"SHAPE BEFORE FOR")
     # Upscale each frame
     for i in range(frames_bw_np.shape[0]):
         frame_np = frames_bw_np[i]  # shape [32, 32] as a numpy array
@@ -1606,7 +1607,7 @@ def run_latentspace_mmnist_inference(prompt,model_repo_id,model_file_name,num_in
         upscaled_frame = cv2.resize(frame_np, (output_width, output_height), interpolation=cv2.INTER_LANCZOS4)
 
         # Convert back to tensor and add the channel dimension to match [512, 512, 1]
-        tmp = torch.from_numpy(upscaled_frame).unsqueeze(2).repeat(1, 1, 3)
+        tmp = torch.from_numpy(upscaled_frame)
         upscaled_frames.append(tmp)
 
     # Stack upscaled frames to create a single tensor of shape [16, 512, 512, 3]

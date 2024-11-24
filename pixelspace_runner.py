@@ -34,9 +34,8 @@ from datasets.features.features import FeatureType, _align_features, _check_if_f
 from datasets.formatting.formatting import PythonFormatter, TensorFormatter
 from datasets.formatting import get_format_type_from_alias, get_formatter
 
-sys.path.append('/kaggle/working/Imagine-Gen-Inference-UI/VideoCrafter')
-# print("DEEBUG",sys.path)
-
+sys.path.append('/kaggle/working/VideoCrafter')
+print("DEEBUG",sys.path)
 
 ## VideoCrafter Specific Imports
 from omegaconf import OmegaConf

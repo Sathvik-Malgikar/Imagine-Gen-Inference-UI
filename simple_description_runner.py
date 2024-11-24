@@ -754,7 +754,7 @@ DTYPE_PT = torch.float32
 EMBEDDING_DIMENSION = 4096
 CROSS_ATTN_TEXT_CONTEXT_LEN = MAX_WORD_COUNT_LIMIT
 
-with open('/kaggle/working/Imagine-Gen-Inference-UI/VideoCrafter/.env','w') as f:
+with open('/kaggle/working/VideoCrafter/.env','w') as f:
     env_str=f'CROSS_ATTN_TEXT_CONTEXT_LEN = {CROSS_ATTN_TEXT_CONTEXT_LEN}'
     f.write(env_str)
 
@@ -830,7 +830,7 @@ class InteractiveChatVideoGenModel(L.LightningModule):
             fsdp_auto_wrap_policy=None, 
             shard_output_callback=None, 
             use_xla=False,
-            yaml_config_file_path='/kaggle/working/Imagine-Gen-Inference-UI/VideoCrafter/configs/inference_t2v_512_v2.0.yaml'):
+            yaml_config_file_path='/kaggle/working/VideoCrafter/configs/inference_t2v_512_v2.0.yaml'):
             
         super(InteractiveChatVideoGenModel, self).__init__()
         self.height = height

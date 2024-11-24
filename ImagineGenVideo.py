@@ -32,7 +32,7 @@ elif selected_runner == "Temporal Decoder":
 elif selected_runner == "Simple Description":
     default_model_file = "pytorch_model_unet_cross_attn_192_tmp_dcd_bridge_ae_simple_desc_ddim_optical_flow_eph_1_sakuga.bin"
 else:
-     = "placeholder.bin"
+    default_model_file = "placeholder.bin"
     
 
 inference_steps = int(st.text_input("Enter Inference steps",value = 1))

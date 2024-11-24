@@ -3,6 +3,7 @@ import sys
 import streamlit as st
 from temporal_decoder_runner import run_temporal_decoder_inference
 from pixelspace_runner import run_pixelspace_inference
+from latent_mmnist_runner import run_latentspace_mmnist_inference
 from dummy_runner import dummy_runner_inference
 from simple_description_runner import run_simple_desc_inference
 from moviepy import VideoFileClip, concatenate_videoclips
@@ -20,13 +21,15 @@ for message in st.session_state.messages:
 
 import base64
 
-runners_list = ["Pixel space(no vae)","Temporal Decoder","FLUX VAE","DUMMY runner", "AE","Simple Description"]
+runners_list = ["Pixel space(no vae)","Latent Space Moving MNIST","Temporal Decoder","FLUX VAE","DUMMY runner", "AE","Simple Description"]
 
 
 selected_runner = st.selectbox("Select a runner based on VAE used.", tuple(runners_list))
 
 if selected_runner == "Pixel space(no vae)":
     default_model_file = "pytorch_model_unet_cross_attn_192_temp_decoder_ddim_initial_frames_res-reduction_bw_eph_2_mmnist_easy_pixelspace.bin"
+if selected_runner == "Latent Space Moving MNIST":
+    default_model_file = "pytorch_model_unet_cross_attn_192_temp_decoder_ddim_initial_frames_eph_2_mmnist_easy.bin"
 elif selected_runner == "Temporal Decoder":
     default_model_file = "pytorch_model_unet_cross_attn_192_temp_decoder_ddim_optical_flow_eph_8_sakuga.bin"
 elif selected_runner == "Simple Description":
@@ -102,6 +105,8 @@ if prompt := st.chat_input("Please enter a text prompt"):
         video_str = run_temporal_decoder_inference(prompt, "amrithagk/capstone_model", model_file_name, inference_steps, unconditional_guidance_scale=cfg_scale)
     elif selected_runner == "Simple Description" :
         video_str = run_simple_desc_inference(prompt, "amrithagk/capstone_model", model_file_name, inference_steps, unconditional_guidance_scale=cfg_scale)
+    elif selected_runner == "Latent Space Moving MNIST" :
+        video_str = run_latentspace_mmnist_inference(prompt, "Hemabhushan/capstone_model", model_file_name, inference_steps, unconditional_guidance_scale=cfg_scale)
     
     st.session_state.path_array.append(video_str)
 

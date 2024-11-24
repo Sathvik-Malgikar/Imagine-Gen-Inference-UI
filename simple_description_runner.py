@@ -1581,60 +1581,71 @@ def batch_ddim_sampling(model, cond, noise_shape, n_samples=1, ddim_steps=50, dd
     return batch_variants
 
 
+def load_model(model_repo_id,model_file_name):
+    global simple_int_gen_model
+    """ Load the UNET """
+    checkpoint_path = hf_hub_download(repo_id=model_repo_id, filename=model_file_name)
+
+    print(checkpoint_path)
+        
+    state_dict = torch.load(checkpoint_path)
+
+    simple_int_gen_model = InteractiveChatVideoGenModel(
+    batch_size=TRAIN_BATCH_SIZE, use_llm=False, use_tpu_vm=False, use_xla=False,use_vae=True)
+
+    simple_int_gen_model.configure_model()
+
+    simple_int_gen_model.load_state_dict(state_dict)
+
+    #print(simple_int_gen_model.latent_diffusion_model.alphas_cumprod)
+
+    simple_int_gen_model.latent_diffusion_model.register_schedule(given_betas=None, beta_schedule="linear", timesteps=simple_int_gen_model.latent_diffusion_model_config['params']['timesteps'],linear_start=simple_int_gen_model.latent_diffusion_model_config['params']['linear_start'], linear_end=simple_int_gen_model.latent_diffusion_model_config['params']['linear_end'], cosine_s=8e-3)
+
+    print(simple_int_gen_model.latent_diffusion_model.alphas_cumprod)
+
+
+    sys.exit()
+    
+    simple_int_gen_model.multimodal_llm=LlavaNextVideoForConditionalGeneration.from_pretrained(simple_int_gen_model.multimodal_llm_id,torch_dtype=DTYPE_PT,load_in_4bit=True,device_map="cuda:0")
+
+    simple_int_gen_model.multimodal_llm_processor = LlavaNextVideoProcessor.from_pretrained(simple_int_gen_model.multimodal_llm_id)
+
+
+simple_int_gen_model = None
 
 @torch.no_grad()
-def run_simple_desc_inference(prompt,int_chat_video_gen_model, model_repo_id,model_file_name,num_inference_steps=50,fps=24,ddim_eta=1.0,unconditional_guidance_scale=1.0):
-    # checkpoint_path = hf_hub_download(repo_id=model_repo_id, filename=model_file_name)
-
-    # print(checkpoint_path)
-
-    # state_dict = torch.load(checkpoint_path)
-
-
-    # int_chat_video_gen_model = InteractiveChatVideoGenModel(
-    # batch_size=TRAIN_BATCH_SIZE, use_llm=False, use_tpu_vm=False, use_xla=False,use_vae=True)
-
-    # int_chat_video_gen_model.configure_model()
-
-    # int_chat_video_gen_model.load_state_dict(state_dict)
-
-    # #print(int_chat_video_gen_model.latent_diffusion_model.alphas_cumprod)
-
-    # int_chat_video_gen_model.latent_diffusion_model.register_schedule(given_betas=None, beta_schedule="linear", timesteps=int_chat_video_gen_model.latent_diffusion_model_config['params']['timesteps'],linear_start=int_chat_video_gen_model.latent_diffusion_model_config['params']['linear_start'], linear_end=int_chat_video_gen_model.latent_diffusion_model_config['params']['linear_end'], cosine_s=8e-3)
-
-    #print(int_chat_video_gen_model.latent_diffusion_model.alphas_cumprod)
-
-
-    #sys.exit()
+def run_simple_desc_inference(prompt, model_repo_id,model_file_name,num_inference_steps=50,fps=24,ddim_eta=1.0,unconditional_guidance_scale=1.0):
     
-    # int_chat_video_gen_model.multimodal_llm=LlavaNextVideoForConditionalGeneration.from_pretrained(int_chat_video_gen_model.multimodal_llm_id,torch_dtype=DTYPE_PT,load_in_4bit=True,device_map="cuda:0")
-
-    # int_chat_video_gen_model.multimodal_llm_processor = LlavaNextVideoProcessor.from_pretrained(int_chat_video_gen_model.multimodal_llm_id)
+    global simple_int_gen_model
+    
+    if simple_int_gen_model is None:
+        print("First run, loading model...")
+        load_model(model_repo_id,model_file_name)
 
     ### UNCOMMENT THE BELOW BLOCK UPTO INDICATION
     b_text_description=[prompt]
 
-    b_llm_text_input = [int_chat_video_gen_model.get_next_conversation_prompt_from_conversation([],text_desc,initial_prompt=True) for text_desc in b_text_description]
+    b_llm_text_input = [simple_int_gen_model.get_next_conversation_prompt_from_conversation([],text_desc,initial_prompt=True) for text_desc in b_text_description]
 
-    b_llm_input_processed = int_chat_video_gen_model.multimodal_llm_processor([elem[1] for elem in b_llm_text_input],padding=True, return_tensors="pt")
+    b_llm_input_processed = simple_int_gen_model.multimodal_llm_processor([elem[1] for elem in b_llm_text_input],padding=True, return_tensors="pt")
 
-    b_llm_output = int_chat_video_gen_model.multimodal_llm.generate(b_llm_input_processed['input_ids'],return_dict_in_generate=True,output_hidden_states=True, max_new_tokens=MAX_WORD_COUNT_LIMIT, do_sample=False)
+    b_llm_output = simple_int_gen_model.multimodal_llm.generate(b_llm_input_processed['input_ids'],return_dict_in_generate=True,output_hidden_states=True, max_new_tokens=MAX_WORD_COUNT_LIMIT, do_sample=False)
 
-    b_llm_hidden_states =  int_chat_video_gen_model.get_last_layer_hidden_states_from_llm_output_batched_torch(b_llm_output)[0]
+    b_llm_hidden_states =  simple_int_gen_model.get_last_layer_hidden_states_from_llm_output_batched_torch(b_llm_output)[0]
     #print("Raw HS shape: ", b_llm_hidden_states.shape)
     b_llm_hidden_states=b_llm_hidden_states.flatten(0,1)
     #print("Flattened HS shape: ", b_llm_hidden_states.shape)
-    int_chat_video_gen_model.latent_diffusion_model=int_chat_video_gen_model.latent_diffusion_model.to("cuda")
+    simple_int_gen_model.latent_diffusion_model=simple_int_gen_model.latent_diffusion_model.to("cuda")
     
-    int_chat_video_gen_model.bridge_autoencoder=int_chat_video_gen_model.bridge_autoencoder.to("cuda")
+    simple_int_gen_model.bridge_autoencoder=simple_int_gen_model.bridge_autoencoder.to("cuda")
 
-    int_chat_video_gen_model.vae=int_chat_video_gen_model.vae.to("cuda")
+    simple_int_gen_model.vae=simple_int_gen_model.vae.to("cuda")
 
     b_llm_hidden_states=b_llm_hidden_states.to("cuda")
     
-    # bridge_net_op=int_chat_video_gen_model.bridge_mlp(b_llm_hidden_states)
+    # bridge_net_op=simple_int_gen_model.bridge_mlp(b_llm_hidden_states)
 
-    bridge_net_op=int_chat_video_gen_model.bridge_ae_encode(b_llm_hidden_states)
+    bridge_net_op=simple_int_gen_model.bridge_ae_encode(b_llm_hidden_states)
     #print("Encoded bridge op shape: ", bridge_net_op.shape)
 
     bridge_net_op=bridge_net_op.unsqueeze(0)
@@ -1668,15 +1679,15 @@ def run_simple_desc_inference(prompt,int_chat_video_gen_model, model_repo_id,mod
     ### COMMENT UPTO ABOVE LINE TO PERFORM ON-THE-GO LLM OPS
     
 
-    int_chat_video_gen_model.batch_size=1
+    simple_int_gen_model.batch_size=1
 
-    int_chat_video_gen_model.eval()
+    simple_int_gen_model.eval()
 
-    noise_shape = [int_chat_video_gen_model.batch_size, int_chat_video_gen_model.latent_diffusion_model.channels, int_chat_video_gen_model.num_frames, int_chat_video_gen_model.latent_size, int_chat_video_gen_model.latent_size]
+    noise_shape = [simple_int_gen_model.batch_size, simple_int_gen_model.latent_diffusion_model.channels, simple_int_gen_model.num_frames, simple_int_gen_model.latent_size, simple_int_gen_model.latent_size]
     print("noise dims generated")    
     cond = {"c_crossattn": [bridge_net_op], "fps": fps}
 
-    batch_samples = batch_ddim_sampling(int_chat_video_gen_model, cond, noise_shape, 1, \
+    batch_samples = batch_ddim_sampling(simple_int_gen_model, cond, noise_shape, 1, \
                                                 num_inference_steps, ddim_eta, unconditional_guidance_scale)
     print("got batch samples")    
     save_videos(batch_samples, '/kaggle/working/Imagine-Gen-Inference-UI/', [f'{prompt[:10]}_is_{num_inference_steps}_cfg_{unconditional_guidance_scale}_eta_{ddim_eta}_{prompt}'], fps=8)

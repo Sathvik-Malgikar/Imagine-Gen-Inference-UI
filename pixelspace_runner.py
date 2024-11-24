@@ -12,7 +12,7 @@ from collections import Counter
 from io import BytesIO
 import requests
 import tempfile
-import moviepy.editor as mp
+import moviepy as mp
 import lightning as L
 from tqdm import tqdm
 import tqdm.notebook as tq

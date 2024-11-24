@@ -1,4 +1,4 @@
-from moviepy.editor import VideoFileClip, concatenate_videoclips
+from moviepy import VideoFileClip, concatenate_videoclips
 output_path = "IMAGINE_GEN_GENERATED_VIDEO.mp4"
 
 def stitch_videos():

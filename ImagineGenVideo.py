@@ -105,16 +105,16 @@ if prompt := st.chat_input("Please enter a text prompt"):
     elif selected_runner == "Simple Description" :
         video_str = run_simple_desc_inference(prompt, "amrithagk/capstone_model", model_file_name, inference_steps, unconditional_guidance_scale=cfg_scale)
     elif selected_runner == "Latent Space Moving MNIST" :
-        video_str = run_latentspace_mmnist_inference(prompt, "Hemabhushan/capstone_model", model_file_name, inference_steps, unconditional_guidance_scale=cfg_scale)
-        # for i in run_latentspace_mmnist_inference(prompt, "Hemabhushan/capstone_model", model_file_name, inference_steps, unconditional_guidance_scale=cfg_scale):
-        #     if type(i) == str:
-        #         progress_bar.progress(1)
-        #         video_str = i
-        #         break
-        #     # Calculate progress percentage
-        #     progress_percentage = (i + 1) / inference_steps
-        #     # Update the progress bar
-        #     progress_bar.progress(progress_percentage)
+        # video_str = run_latentspace_mmnist_inference(prompt, "Hemabhushan/capstone_model", model_file_name, inference_steps, unconditional_guidance_scale=cfg_scale)
+        for i in run_latentspace_mmnist_inference(prompt, "Hemabhushan/capstone_model", model_file_name, inference_steps, unconditional_guidance_scale=cfg_scale):
+            if type(i) == str:
+                progress_bar.progress(1)
+                video_str = i
+                break
+            # Calculate progress percentage
+            progress_percentage = (i + 1) / inference_steps
+            # Update the progress bar
+            progress_bar.progress(progress_percentage)
     
     st.session_state.path_array.append(video_str)
 

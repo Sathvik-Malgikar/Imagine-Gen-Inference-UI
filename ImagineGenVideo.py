@@ -97,7 +97,7 @@ if prompt := st.chat_input("Please enter a text prompt"):
                 video_str = i
                 break
             # Calculate progress percentage
-            progress_percentage = (i + 1) / inference_steps
+            progress_percentage = min((i + 1) / inference_steps,1)
             # Update the progress bar
             progress_bar.progress(progress_percentage)
     elif selected_runner == "DUMMY runner" :
@@ -111,7 +111,7 @@ if prompt := st.chat_input("Please enter a text prompt"):
                 video_str = i
                 break
             # Calculate progress percentage
-            progress_percentage = (i + 1) / inference_steps
+            progress_percentage = min((i + 1) / inference_steps,1)
             # Update the progress bar
             progress_bar.progress(progress_percentage)
     elif selected_runner == "Latent Space Moving MNIST" :
@@ -122,7 +122,7 @@ if prompt := st.chat_input("Please enter a text prompt"):
                 video_str = i
                 break
             # Calculate progress percentage
-            progress_percentage = (i + 1) / inference_steps
+            progress_percentage = min((i + 1) / inference_steps,1)
             # Update the progress bar
             progress_bar.progress(progress_percentage)
     

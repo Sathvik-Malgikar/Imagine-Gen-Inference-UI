@@ -22,8 +22,10 @@ import base64
 
 runners_list = ["Pixel space(no vae)","Latent Space Moving MNIST","Temporal Decoder","FLUX VAE","DUMMY runner", "AE","Simple Description"]
 
+def toast():
+    st.info('Please wait, loading the model might take time! Check Logs for more info.')
 
-selected_runner = st.selectbox("Select a runner based on VAE used.", tuple(runners_list))
+selected_runner = st.selectbox("Select a runner based on VAE used.", tuple(runners_list), on_change=toast )
 
 if selected_runner == "Pixel space(no vae)":
     default_model_file = "pytorch_model_unet_cross_attn_192_temp_decoder_ddim_initial_frames_res-reduction_bw_eph_2_mmnist_easy_pixelspace.bin"
@@ -103,7 +105,15 @@ if prompt := st.chat_input("Please enter a text prompt"):
     elif selected_runner == "Temporal Decoder" :
         video_str = run_temporal_decoder_inference(prompt, "amrithagk/capstone_model", model_file_name, inference_steps, unconditional_guidance_scale=cfg_scale)
     elif selected_runner == "Simple Description" :
-        video_str = run_simple_desc_inference(prompt, "amrithagk/capstone_model", model_file_name, inference_steps, unconditional_guidance_scale=cfg_scale)
+        for i in run_simple_desc_inference(prompt, "amrithagk/capstone_model", model_file_name, inference_steps, unconditional_guidance_scale=cfg_scale):
+            if type(i) == str:
+                progress_bar.progress(1)
+                video_str = i
+                break
+            # Calculate progress percentage
+            progress_percentage = (i + 1) / inference_steps
+            # Update the progress bar
+            progress_bar.progress(progress_percentage)
     elif selected_runner == "Latent Space Moving MNIST" :
         # video_str = run_latentspace_mmnist_inference(prompt, "Hemabhushan/capstone_model", model_file_name, inference_steps, unconditional_guidance_scale=cfg_scale)
         for i in run_latentspace_mmnist_inference(prompt, "Hemabhushan/capstone_model", model_file_name, inference_steps, unconditional_guidance_scale=cfg_scale):

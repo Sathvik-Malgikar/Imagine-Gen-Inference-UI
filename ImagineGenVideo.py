@@ -28,13 +28,13 @@ def toast():
 selected_runner = st.selectbox("Select a runner based on VAE used.", tuple(runners_list), on_change=toast )
 
 if selected_runner == "Pixel space(no vae)":
-    default_model_file = "pytorch_model_unet_cross_attn_192_temp_decoder_ddim_initial_frames_res-reduction_bw_eph_4_mmnist_easy_pixelspace.bin"
+    default_model_file = "pytorch_model_unet_cross_attn_192_temp_decoder_ddim_initial_frames_res-reduction_bw_eph_2_mmnist_easy_pixelspace.bin"
 if selected_runner == "Latent Space Moving MNIST":
-    default_model_file = "pytorch_model_unet_cross_attn_192_temp_decoder_ddim_initial_frames_eph_2_mmnist_easy.bin"
+    default_model_file = "pytorch_model_unet_cross_attn_192_temp_decoder_ddim_initial_frames_eph_4_mmnist_easy.bin"
 elif selected_runner == "Temporal Decoder":
     default_model_file = "pytorch_model_unet_cross_attn_192_temp_decoder_ddim_optical_flow_eph_8_sakuga.bin"
 elif selected_runner == "Simple Description":
-    default_model_file = "pytorch_model_unet_cross_attn_192_tmp_dcd_bridge_ae_simple_desc_ddim_optical_flow_eph_1_sakuga.bin"
+    default_model_file = "pytorch_model_unet_cross_attn_192_tmp_dcd_bridge_ae_simple_desc_ddim_optical_flow_eph_10_sakuga.bin"
 else:
     default_model_file = "placeholder.bin"
     

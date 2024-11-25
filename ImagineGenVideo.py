@@ -29,7 +29,7 @@ selected_runner = st.selectbox("Select a runner based on VAE used.", tuple(runne
 
 if selected_runner == "Pixel space(no vae)":
     default_model_file = "pytorch_model_unet_cross_attn_192_temp_decoder_ddim_initial_frames_res-reduction_bw_eph_2_mmnist_easy_pixelspace.bin"
-if selected_runner == "Latent Space Moving MNIST":
+elif selected_runner == "Latent Space Moving MNIST":
     default_model_file = "pytorch_model_unet_cross_attn_192_temp_decoder_ddim_initial_frames_eph_4_mmnist_easy.bin"
 elif selected_runner == "Temporal Decoder":
     default_model_file = "pytorch_model_unet_cross_attn_192_temp_decoder_ddim_optical_flow_eph_8_sakuga.bin"

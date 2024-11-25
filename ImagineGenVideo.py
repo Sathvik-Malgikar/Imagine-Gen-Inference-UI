@@ -25,7 +25,7 @@ runners_list = ["Pixel space(no vae)","Latent Space Moving MNIST","Temporal Deco
 def toast():
     st.info('Please wait, loading the model might take time! Check Logs for more info.')
 
-selected_runner = st.selectbox("Select a runner based on VAE used.", tuple(runners_list), on_change=toast, value = "Pixel space(no vae)" )
+selected_runner = st.selectbox("Select a runner based on VAE used.", tuple(runners_list), on_change=toast, placeholder = "Select a Runner" )
 
 if selected_runner == "Pixel space(no vae)":
     default_model_file = "pytorch_model_unet_cross_attn_192_temp_decoder_ddim_initial_frames_res-reduction_bw_eph_2_mmnist_easy_pixelspace.bin"

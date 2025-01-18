@@ -1697,9 +1697,9 @@ def run_simple_desc_inference(prompt, model_repo_id,model_file_name,num_inferenc
             break
         yield temp_
     print("got batch samples")    
-    save_videos(batch_samples, '/kaggle/working/Imagine-Gen-Inference-UI/outputs/', [f'{prompt[:10]}_is_{num_inference_steps}_cfg_{unconditional_guidance_scale}_eta_{ddim_eta}_{prompt}'], fps=8)
+    save_videos(batch_samples, '/kaggle/working/Imagine-Gen-Inference-UI/outputs/', [f'{prompt[:10]}_is_{num_inference_steps}_cfg_{unconditional_guidance_scale}_eta_{ddim_eta}'], fps=8)
     print("Saved video")
-    yield "/kaggle/working/Imagine-Gen-Inference-UI/outputs/" + f'{prompt[:10]}_is_{num_inference_steps}_cfg_{unconditional_guidance_scale}_eta_{ddim_eta}_{prompt}' + ".mp4"
+    yield "/kaggle/working/Imagine-Gen-Inference-UI/outputs/" + f'{prompt[:10]}_is_{num_inference_steps}_cfg_{unconditional_guidance_scale}_eta_{ddim_eta}' + ".mp4"
     
 if __name__=="__main__":
     #text_prompt="A majestic fantasy castle with a grand fountain and ornate architecture under a blue sky, in a city with ocean views."
